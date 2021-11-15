@@ -4,7 +4,7 @@ use crate::get_context;
 use crate::prelude::screen_height;
 use crate::prelude::screen_width;
 use crate::Vec2;
-pub use miniquad::{KeyCode, MouseButton};
+pub use miniquad::{KeyCode, MouseButton, CursorIcon};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TouchPhase {
@@ -157,6 +157,11 @@ pub fn is_mouse_button_released(btn: MouseButton) -> bool {
     let context = get_context();
 
     context.mouse_released.contains(&btn)
+}
+
+pub fn set_cursor_icon(icon: CursorIcon) {
+    let context = get_context();
+    context.cursor_icon = icon;
 }
 
 /// Convert a position in pixels to a position in the range [-1; 1].

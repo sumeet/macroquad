@@ -278,13 +278,18 @@ pub fn draw_text(text: &str, x: f32, y: f32, font_size: f32, color: Color) {
 
 /// Draw text with custom params such as font, font size and font scale.
 pub fn draw_text_ex(text: &str, x: f32, y: f32, params: TextParams) {
+   draw_text_ex_callback(text, x, y, params, None::<fn(_, _)>)
+}
+
+/// Draw text with custom params such as font, font size and font scale.
+pub fn draw_text_ex_callback(text: &str, x: f32, y: f32, params: TextParams, mut callback: Option<impl FnMut(usize, Rect)>) {
     let font = get_context().fonts_storage.get_font_mut(params.font);
 
     let font_scale_x = params.font_scale * params.font_scale_aspect;
     let font_scale_y = params.font_scale;
 
     let mut total_width = 0.;
-    for character in text.chars() {
+    for (i, character) in text.chars().enumerate() {
         if font.characters.contains_key(&(character, params.font_size)) == false {
             font.cache_glyph(character, params.font_size);
         }
@@ -322,6 +327,10 @@ pub fn draw_text_ex(text: &str, x: f32, y: f32, params: TextParams) {
                 ..Default::default()
             },
         );
+
+        if let Some(ref mut callback) = callback {
+            callback(i, dest);
+        }
     }
 }
 

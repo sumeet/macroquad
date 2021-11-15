@@ -174,6 +174,7 @@ struct Context {
     quit_requested: bool,
 
     cursor_grabbed: bool,
+    cursor_icon: CursorIcon,
 
     input_events: Vec<Vec<MiniquadInputEvent>>,
 
@@ -294,6 +295,7 @@ impl Context {
 
             cursor_grabbed: false,
 
+            cursor_icon: CursorIcon::Default,
             input_events: Vec::new(),
 
             camera_matrix: None,
@@ -326,6 +328,7 @@ impl Context {
 
         self.ui_context.process_input();
         self.clear(Self::DEFAULT_BG_COLOR);
+        self.cursor_icon = CursorIcon::Default;
     }
 
     fn end_frame(&mut self) {
@@ -355,6 +358,8 @@ impl Context {
         self.keys_released.clear();
         self.mouse_pressed.clear();
         self.mouse_released.clear();
+
+        self.quad_context.set_mouse_cursor(self.cursor_icon);
 
         self.quit_requested = false;
 
