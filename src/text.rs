@@ -1,5 +1,6 @@
 //! Functions to load fonts and draw text.
 
+use core::cmp::Ordering::Equal;
 use std::collections::HashMap;
 
 use crate::{
@@ -18,6 +19,9 @@ use std::rc::Rc;
 pub(crate) mod atlas;
 
 use atlas::Atlas;
+use fontdue::layout::{
+    CoordinateSystem, HorizontalAlign, Layout, LayoutSettings, TextStyle, VerticalAlign, WrapStyle,
+};
 
 #[derive(Debug)]
 pub(crate) struct CharacterInfo {
@@ -122,6 +126,38 @@ impl FontInternal {
 
     pub(crate) fn get(&self, character: char, size: u16) -> Option<&CharacterInfo> {
         self.characters.get(&(character, size))
+    }
+
+    pub fn measure_text_smt(
+        &mut self,
+        text: &str,
+        font_size: u16,
+        font_scale_x: f32,
+        font_scale_y: f32,
+    ) -> TextDimensions {
+        let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+        layout.reset(&LayoutSettings {
+            x: 0.,
+            y: 0.,
+            max_width: Some(800.),
+            max_height: Some(600.),
+            horizontal_align: HorizontalAlign::Left,
+            vertical_align: VerticalAlign::Top,
+            wrap_style: WrapStyle::Letter,
+            wrap_hard_breaks: true,
+        });
+        let scaled_font_size = font_size as f32 * ((font_scale_x + font_scale_y) / 2.);
+        layout.append(&[&self.font], &TextStyle::new(text, scaled_font_size, 0));
+        TextDimensions {
+            width: layout
+                .glyphs()
+                .iter()
+                .map(|glyph| glyph.x + glyph.width as f32)
+                .max_by(|a, b| a.partial_cmp(b).unwrap_or(Equal))
+                .unwrap_or(0.) as _,
+            height: layout.height(),
+            offset_y: 0.0,
+        }
     }
 
     pub(crate) fn measure_text(
@@ -276,13 +312,85 @@ pub fn draw_text(text: &str, x: f32, y: f32, font_size: f32, color: Color) {
     )
 }
 
-/// Draw text with custom params such as font, font size and font scale.
-pub fn draw_text_ex(text: &str, x: f32, y: f32, params: TextParams) {
-   draw_text_ex_callback(text, x, y, params, None::<fn(_, _)>)
+pub fn draw_text_ex_smt(
+    text: &str,
+    x: f32,
+    y: f32,
+    params: TextParams,
+    mut callback: Option<impl FnMut(usize, Rect)>,
+) {
+    let font = get_context().fonts_storage.get_font_mut(params.font);
+
+    let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+    layout.reset(&LayoutSettings {
+        x,
+        y,
+        max_width: Some(800.),
+        max_height: Some(600.),
+        horizontal_align: HorizontalAlign::Left,
+        vertical_align: VerticalAlign::Top,
+        wrap_style: WrapStyle::Letter,
+        wrap_hard_breaks: true,
+    });
+    layout.append(
+        &[&font.font],
+        &TextStyle::new(text, params.font_size as f32 * params.font_scale, 0),
+    );
+    let glyphs = layout.glyphs();
+
+    for (i, (character, glyph_pos)) in text.chars().zip(glyphs).enumerate() {
+        if font.characters.contains_key(&(character, params.font_size)) == false {
+            font.cache_glyph(character, params.font_size);
+        }
+        let mut atlas = font.atlas.borrow_mut();
+        let font_data = &font.characters[&(character, params.font_size)];
+        let glyph = atlas.get(font_data.sprite).unwrap().rect;
+
+        let dest = Rect::new(
+            glyph_pos.x,
+            glyph_pos.y,
+            glyph_pos.width as _,
+            glyph_pos.height as _,
+        );
+
+        let source = Rect::new(
+            glyph.x as f32,
+            glyph.y as f32,
+            glyph.w as f32,
+            glyph.h as f32,
+        );
+
+        crate::texture::draw_texture_ex(
+            atlas.texture(),
+            dest.x,
+            dest.y,
+            params.color,
+            crate::texture::DrawTextureParams {
+                dest_size: Some(vec2(dest.w, dest.h)),
+                source: Some(source),
+                ..Default::default()
+            },
+        );
+
+        if let Some(ref mut callback) = callback {
+            callback(i, dest);
+        }
+    }
 }
 
 /// Draw text with custom params such as font, font size and font scale.
-pub fn draw_text_ex_callback(text: &str, x: f32, y: f32, params: TextParams, mut callback: Option<impl FnMut(usize, Rect)>) {
+pub fn draw_text_ex(text: &str, x: f32, y: f32, params: TextParams) {
+    draw_text_ex_callback(text, x, y, params, None::<fn(_, _)>)
+}
+
+/// Draw text with custom params such as font, font size and font scale.
+pub fn draw_text_ex_callback(
+    text: &str,
+    x: f32,
+    y: f32,
+    params: TextParams,
+    mut callback: Option<impl FnMut(usize, Rect)>,
+) {
     let font = get_context().fonts_storage.get_font_mut(params.font);
 
     let font_scale_x = params.font_scale * params.font_scale_aspect;
@@ -335,6 +443,7 @@ pub fn draw_text_ex_callback(text: &str, x: f32, y: f32, params: TextParams, mut
 }
 
 /// World space dimensions of the text, measured by "measure_text" function
+#[derive(Debug)]
 pub struct TextDimensions {
     /// Distance from very left to very right of the rasterized text
     pub width: f32,
@@ -357,6 +466,18 @@ pub fn measure_text(
         .get_font_mut(font.unwrap_or(Font::default()));
 
     font.measure_text(text, font_size, font_scale, font_scale)
+}
+
+pub fn measure_text_smt(
+    text: &str,
+    font: Option<Font>,
+    font_size: u16,
+    font_scale: f32,
+) -> TextDimensions {
+    let font = get_context()
+        .fonts_storage
+        .get_font_mut(font.unwrap_or(Font::default()));
+    font.measure_text_smt(text, font_size, font_scale, font_scale)
 }
 
 pub(crate) struct FontsStorage {
