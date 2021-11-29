@@ -312,11 +312,13 @@ pub fn draw_text(text: &str, x: f32, y: f32, font_size: f32, color: Color) {
     )
 }
 
-pub fn draw_text_ex_smt(
+pub fn draw_text_ex_wrapped(
     text: &str,
     x: f32,
     y: f32,
     params: TextParams,
+    max_width: Option<f32>,
+    max_height: Option<f32>,
     mut callback: Option<impl FnMut(usize, Rect)>,
 ) {
     let font = get_context().fonts_storage.get_font_mut(params.font);
@@ -325,8 +327,8 @@ pub fn draw_text_ex_smt(
     layout.reset(&LayoutSettings {
         x,
         y,
-        max_width: Some(800.),
-        max_height: Some(600.),
+        max_width,
+        max_height,
         horizontal_align: HorizontalAlign::Left,
         vertical_align: VerticalAlign::Top,
         wrap_style: WrapStyle::Letter,
