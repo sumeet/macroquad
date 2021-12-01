@@ -128,19 +128,21 @@ impl FontInternal {
         self.characters.get(&(character, size))
     }
 
-    pub fn measure_text_smt(
+    pub fn measure_text_wrapped(
         &mut self,
         text: &str,
         font_size: u16,
         font_scale_x: f32,
         font_scale_y: f32,
+        max_width: Option<f32>,
+        max_height: Option<f32>,
     ) -> TextDimensions {
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
         layout.reset(&LayoutSettings {
             x: 0.,
             y: 0.,
-            max_width: Some(800.),
-            max_height: Some(600.),
+            max_width,
+            max_height,
             horizontal_align: HorizontalAlign::Left,
             vertical_align: VerticalAlign::Top,
             wrap_style: WrapStyle::Letter,
@@ -470,16 +472,20 @@ pub fn measure_text(
     font.measure_text(text, font_size, font_scale, font_scale)
 }
 
-pub fn measure_text_smt(
+pub fn measure_text_wrapped(
     text: &str,
     font: Option<Font>,
     font_size: u16,
     font_scale: f32,
+    max_width: Option<f32>,
+    max_height: Option<f32>,
 ) -> TextDimensions {
     let font = get_context()
         .fonts_storage
         .get_font_mut(font.unwrap_or(Font::default()));
-    font.measure_text_smt(text, font_size, font_scale, font_scale)
+    font.measure_text_wrapped(
+        text, font_size, font_scale, font_scale, max_width, max_height,
+    )
 }
 
 pub(crate) struct FontsStorage {
